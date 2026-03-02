@@ -4,4 +4,3 @@ notebook
 kedro~=1.2.0
 kedro-datasets[pandas,tensorflow]
 mlflow
-kedro-mlflow

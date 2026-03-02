@@ -104,7 +104,7 @@ def train_model(
     
     # Créer le modèle
     input_shape = (X_train_cnn.shape[1], 1)  # (7, 1)
-    with mlflow.start_run(nested=True) as run:
+    with mlflow.start_run() as run:
         # Log des hyperparamètres
         mlflow.log_params({
             "units": units,
@@ -190,20 +190,22 @@ def evaluate_model(
         "per_frequency": per_frequency_metrics
     }
     
-    # Log des métriques d'évaluation dans MLflow
-    mlflow.log_metrics({
-        "test_mse": float(mse),
-        "test_mae": float(mae),
-        "test_r2": float(r2),
-    })
-
-    # Log des métriques par fréquence
-    for col, freq_metrics in per_frequency_metrics.items():
-        freq_label = col.replace("after_exam_", "").replace("_Hz", "")
-        mlflow.log_metric(f"mse_{freq_label}", freq_metrics["mse"])
-        mlflow.log_metric(f"mae_{freq_label}", freq_metrics["mae"])
-        mlflow.log_metric(f"r2_{freq_label}", freq_metrics["r2"])
+    # Log eval metrics into the most recent run of the same experiment
+    mlflow.set_experiment("audio_prediction")
+    last_run = mlflow.search_runs(order_by=["start_time DESC"], max_results=1)
+    if not last_run.empty:
+        run_id = last_run.iloc[0]["run_id"]
+        with mlflow.start_run(run_id=run_id):
+            mlflow.log_metrics({
+                "test_mse": float(mse),
+                "test_mae": float(mae),
+                "test_r2": float(r2),
+            })
+            for col, freq_metrics in per_frequency_metrics.items():
+                freq_label = col.replace("after_exam_", "").replace("_Hz", "")
+                mlflow.log_metric(f"mse_{freq_label}", freq_metrics["mse"])
+                mlflow.log_metric(f"mae_{freq_label}", freq_metrics["mae"])
+                mlflow.log_metric(f"r2_{freq_label}", freq_metrics["r2"])
 
     print(f"Model Performance - MSE: {mse:.4f}, MAE: {mae:.4f}, R2: {r2:.4f}")
-
     return metrics
