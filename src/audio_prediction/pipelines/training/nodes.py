@@ -91,7 +91,7 @@ def train_model(
     )
 
     if mlflow.active_run():
-        mlflow.tensorflow.log_model(model, "modele_vocal_uniquement")
+        mlflow.tensorflow.log_model(model, "modele_vocal")
 
     return model
 
