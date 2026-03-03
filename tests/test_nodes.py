@@ -111,7 +111,7 @@ class TestTrainingNodes:
         X, y = split_features_target(sample_valid_data, INPUT_COLUMNS, OUTPUT_COLUMNS)
         X_train, X_test, y_train, y_test = split_train_test(X, y, 0.2, 42)
         
-        model = train_model(X_train, y_train, X_test, y_test, units=10, epochs=2, batch_size=32)
+        model = train_model(X_train, y_train, units=10, epochs=2, batch_size=32)
         
         assert model is not None
         assert hasattr(model, 'predict')
@@ -121,7 +121,7 @@ class TestTrainingNodes:
         X, y = split_features_target(sample_valid_data, INPUT_COLUMNS, OUTPUT_COLUMNS)
         X_train, X_test, y_train, y_test = split_train_test(X, y, 0.2, 42)
         
-        model = train_model(X_train, y_train, X_test, y_test, units=10, epochs=2, batch_size=32)
+        model = train_model(X_train, y_train, units=10, epochs=2, batch_size=32)
         metrics = evaluate_model(model, X_test, y_test)
         
         assert "overall" in metrics
@@ -158,7 +158,7 @@ class TestInferenceNodes:
         X, y = split_features_target(sample_valid_data, INPUT_COLUMNS, OUTPUT_COLUMNS)
         X_train, X_test, y_train, y_test = split_train_test(X, y, 0.2, 42)
         
-        model = train_model(X_train, y_train, X_test, y_test, units=10, epochs=2, batch_size=32)
+        model = train_model(X_train, y_train, units=10, epochs=2, batch_size=32)
         predictions = predict(model, X_test, OUTPUT_COLUMNS)
         
         assert len(predictions) == len(X_test)

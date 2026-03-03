@@ -31,6 +31,8 @@ data/01_raw/*
 # ignore file based logs
 *.log
 
+#ignore db
+*.db
 ##########################
 # Common files
 

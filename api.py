@@ -5,9 +5,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import pandas as pd
-import pickle
 import os
 import subprocess
+import tensorflow as tf
+import numpy as np
 
 app = FastAPI(
     title="Audio Prediction API",
@@ -16,7 +17,7 @@ app = FastAPI(
 )
 
 # Configuration
-MODEL_PATH = "data/06_models/audiogram_model.pkl"
+MODEL_PATH = "data/06_models/audiogram_model.keras"
 INPUT_COLUMNS = [
     "before_exam_125_Hz", "before_exam_250_Hz", "before_exam_500_Hz",
     "before_exam_1000_Hz", "before_exam_2000_Hz", "before_exam_4000_Hz",
@@ -62,8 +63,7 @@ def load_model():
     """Charge le modèle entraîné."""
     if not os.path.exists(MODEL_PATH):
         return None
-    with open(MODEL_PATH, 'rb') as f:
-        return pickle.load(f)
+    return tf.keras.models.load_model(MODEL_PATH)
 
 
 def validate_row(row: Dict[str, Any], idx: int) -> tuple:
@@ -189,7 +189,10 @@ async def predict(request: PredictionRequest):
         df = pd.DataFrame(valid_data)
         df = df[INPUT_COLUMNS]  # Assurer l'ordre des colonnes
         
-        pred_values = model.predict(df.values)
+        X_array = df.values.astype(np.float32)
+        X_cnn = X_array.reshape((X_array.shape[0], X_array.shape[1], 1))
+        
+        pred_values = model.predict(X_cnn)
         
         for i, idx in enumerate(valid_indices):
             pred_dict = {

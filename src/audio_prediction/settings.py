@@ -44,3 +44,7 @@ CONFIG_LOADER_ARGS = {
 # Class that manages the Data Catalog.
 # from kedro.io import DataCatalog
 # DATA_CATALOG_CLASS = DataCatalog
+
+from audio_prediction.hooks import MLflowHook
+
+HOOKS = (MLflowHook(),)
