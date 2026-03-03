@@ -1,131 +1,87 @@
-"""
-Nodes pour le traitement des données audiométriques.
-"""
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from typing import Dict, Tuple, List, Any
+import logging
 
+logger = logging.getLogger(__name__)
 
-def validate_data(df: pd.DataFrame, input_columns: List[str], output_columns: List[str]) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+def validate_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
-    Valide et nettoie les données d'entrée.
-    Identifie les lignes avec des valeurs invalides (NaN, lettres, hors limites).
-    
-    Args:
-        df: DataFrame brut
-        input_columns: Colonnes d'entrée attendues
-        output_columns: Colonnes de sortie attendues
-    
-    Returns:
-        Tuple contenant le DataFrame nettoyé et un rapport de validation
+    Valide les données au format 'Long'. 
+    Vérifie que chaque patient a bien ses 21 points (0-100dB) pour is_aided=0 et is_aided=1.
     """
-    all_columns = input_columns + output_columns
     validation_report = {
-        "total_rows": len(df),
-        "invalid_rows": [],
-        "removed_rows": 0,
-        "valid_rows": 0
+        "nb_lignes_initiales": len(df),
+        "nb_patients_initiaux": len(df['patient_id'].unique()) if 'patient_id' in df.columns else 0,
+        "patients_ecartes": 0
     }
+
+    # 1. Nettoyage de base : conversion numérique forcée des scores et intensités
+    cols_check = ['recognition_score', 'intensity_db', 'is_aided']
+    for col in cols_check:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
     
-    # Vérifier les colonnes manquantes
-    missing_cols = [col for col in all_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Colonnes manquantes: {missing_cols}")
+    # Supprimer les lignes où le score est invalide (NaN ou hors limites)
+    df = df.dropna(subset=cols_check)
+    df = df[(df['recognition_score'] >= 0) & (df['recognition_score'] <= 110)] # On accepte un petit dépassement
+
+    # 2. Filtrage des patients incomplets
+    # On veut 21 points (0, 5... 100) pour chaque état
+    def est_complet(group):
+        points_sans = len(group[group['is_aided'] == 0])
+        points_avec = len(group[group['is_aided'] == 1])
+        return points_sans == 21 and points_avec == 21
+
+    patients_valides = df.groupby('patient_id').filter(est_complet)
     
-    # Identifier les lignes invalides
-    invalid_indices = set()
+    validation_report["nb_patients_finaux"] = len(patients_valides['patient_id'].unique())
+    validation_report["patients_ecartes"] = validation_report["nb_patients_initiaux"] - validation_report["nb_patients_finaux"]
     
-    for idx, row in df.iterrows():
-        row_issues = []
-        for col in all_columns:
-            value = row[col]
-            
-            # Vérifier NaN
-            if pd.isna(value):
-                row_issues.append(f"{col}: valeur manquante (NaN)")
-                invalid_indices.add(idx)
-            else:
-                # Try converting to float first (handles string numbers like "50")
-                try:
-                    num_val = float(value)
-                    if num_val < -20 or num_val > 150:
-                        row_issues.append(f"{col}: valeur hors limites ({num_val})")
-                        invalid_indices.add(idx)
-                except (ValueError, TypeError):
-                    row_issues.append(f"{col}: valeur non numérique '{value}'")
-                    invalid_indices.add(idx)
-                
-                if row_issues:
-                    validation_report["invalid_rows"].append({
-                        "index": int(idx),
-                        "issues": row_issues
-                    })
-    
-    # Filtrer les données valides
-    valid_mask = ~df.index.isin(invalid_indices)
-    cleaned_df = df[valid_mask].copy()
-    
-    # Convertir en numérique
-    for col in all_columns:
-        cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-    
-    # Supprimer les NaN restants
-    cleaned_df = cleaned_df.dropna(subset=all_columns)
-    
-    validation_report["removed_rows"] = len(df) - len(cleaned_df)
-    validation_report["valid_rows"] = len(cleaned_df)
-    
-    return cleaned_df, validation_report
+    return patients_valides, validation_report
 
 
-def split_features_target(
-    df: pd.DataFrame,
-    input_columns: List[str],
-    output_columns: List[str]
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def prepare_vocal_sequences(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Sépare les features (X) et les targets (y).
-    
-    Args:
-        df: DataFrame nettoyé
-        input_columns: Noms des colonnes d'entrée
-        output_columns: Noms des colonnes de sortie
-    
-    Returns:
-        Tuple (X, y)
+    Transforme le DataFrame validé en séquences (tenseurs) pour le CNN.
+    X = Courbe sans appareil (is_aided=0)
+    y = Courbe avec appareil (is_aided=1)
     """
-    X = df[input_columns].copy()
-    y = df[output_columns].copy()
+    patients = sorted(df['patient_id'].unique())
+    X_list = []
+    y_list = []
+
+    for p_id in patients:
+        p_data = df[df['patient_id'] == p_id]
+        
+        # Courbe Sans Appareil (Triée par intensité de 0 à 100)
+        curve_sans = p_data[p_data['is_aided'] == 0].sort_values('intensity_db')['recognition_score'].values
+        
+        # Courbe Avec Appareil (Target)
+        curve_avec = p_data[p_data['is_aided'] == 1].sort_values('intensity_db')['recognition_score'].values
+        
+        X_list.append(curve_sans)
+        y_list.append(curve_avec)
+
+    # Conversion en float32 pour TensorFlow et ajout de la dimension "canal"
+    # X shape: (nb_patients, 21, 1)
+    # y shape: (nb_patients, 21)
+    X = np.array(X_list).astype('float32').reshape(-1, 21, 1)
+    y = np.array(y_list).astype('float32')
+    
     return X, y
 
 
-def split_train_test(
-    X: pd.DataFrame,
-    y: pd.DataFrame,
-    test_size: float,
+def split_vocal_data(
+    X: np.ndarray, 
+    y: np.ndarray, 
+    test_size: float, 
     random_state: int
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Divise les données en ensembles d'entraînement et de test.
-    
-    Args:
-        X: Features
-        y: Targets
-        test_size: Proportion du jeu de test
-        random_state: Seed pour reproductibilité
-    
-    Returns:
-        Tuple (X_train, X_test, y_train, y_test)
+    Découpe les matrices NumPy en train/test.
     """
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state
     )
-    
-    # Reset indices
-    X_train = X_train.reset_index(drop=True)
-    X_test = X_test.reset_index(drop=True)
-    y_train = y_train.reset_index(drop=True)
-    y_test = y_test.reset_index(drop=True)
-    
     return X_train, X_test, y_train, y_test

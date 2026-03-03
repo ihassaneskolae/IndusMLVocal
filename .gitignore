@@ -33,6 +33,7 @@ data/01_raw/*
 
 #ignore db
 *.db
+*.db.backup*
 ##########################
 # Common files
 

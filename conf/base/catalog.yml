@@ -1,65 +1,64 @@
-# Raw data
+# Données brutes (Tonale et Vocale)
 raw_audiograms:
   type: pandas.CSVDataset
   filepath: data/01_raw/tonal_exams.csv
 
-# Cleaned data
+raw_vocal_data:
+  type: pandas.CSVDataset
+  filepath: data/01_raw/vocal_format_long.csv
+  load_args:
+    sep: ","
+
+# Données intermédiaires nettoyées
 cleaned_audiograms:
   type: pandas.CSVDataset
   filepath: data/02_intermediate/cleaned_audiograms.csv
 
-# Train/Test split
-X_train:
+cleaned_vocal_data:
   type: pandas.CSVDataset
-  filepath: data/05_model_input/X_train.csv
+  filepath: data/02_intermediate/cleaned_vocal_data.csv
+
+# Tenseurs pour le CNN (Sauvegardés en format Pickle)
+X_train:
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/X_train.pkl
 
 X_test:
-  type: pandas.CSVDataset
-  filepath: data/05_model_input/X_test.csv
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/X_test.pkl
 
 y_train:
-  type: pandas.CSVDataset
-  filepath: data/05_model_input/y_train.csv
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/y_train.pkl
 
 y_test:
-  type: pandas.CSVDataset
-  filepath: data/05_model_input/y_test.csv
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/y_test.pkl
 
-# TensorFlow Model
-trained_model:
+X_vocal_full:
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/X_vocal_full.pkl
+
+y_vocal_full:
+  type: pickle.PickleDataset
+  filepath: data/05_model_input/y_vocal_full.pkl
+# Modèle TensorFlow
+vocal_model:
   type: tensorflow.TensorFlowModelDataset
-  filepath: data/06_models/audiogram_model.keras
+  filepath: data/06_models/vocal_model.keras
   save_args:
     save_format: keras
 
-# Metrics
-model_metrics:
-  type: json.JSONDataset
-  filepath: data/08_reporting/metrics.json
-
-# Validation report
+# Reporting
 validation_report:
   type: json.JSONDataset
   filepath: data/08_reporting/validation_report.json
 
-# Inference datasets
-inference_input:
-  type: pandas.CSVDataset
-  filepath: data/01_raw/inference_input.csv
-
-validated_input:
-  type: pandas.CSVDataset
-  filepath: data/02_intermediate/validated_input.csv
-
-validation_errors:
+model_metrics:
   type: json.JSONDataset
-  filepath: data/08_reporting/validation_errors.json
+  filepath: data/08_reporting/metrics.json
 
-predictions:
-  type: pandas.CSVDataset
-  filepath: data/07_model_output/predictions.csv
-
-# Intermediate features/targets
+# --- Reste du catalogue (Inférence / Tonal) ---
 features:
   type: pandas.CSVDataset
   filepath: data/03_primary/features.csv
@@ -67,3 +66,11 @@ features:
 targets:
   type: pandas.CSVDataset
   filepath: data/03_primary/targets.csv
+
+predictions:
+  type: pandas.CSVDataset
+  filepath: data/07_model_output/predictions.csv
+
+vocal_prediction_plot:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/vocal_prediction_test.png
