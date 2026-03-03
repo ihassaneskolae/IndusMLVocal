@@ -5,3 +5,4 @@ kedro~=1.2.0
 kedro-datasets[pandas,tensorflow]
 mlflow
 tensorflow
+tensorflow-metal; sys_platform == "darwin"

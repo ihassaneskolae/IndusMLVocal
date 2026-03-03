@@ -10,7 +10,37 @@ from typing import Dict, Any, Tuple
 import mlflow
 import mlflow.tensorflow
 from mlflow.models.signature import infer_signature
+import platform
+import logging
 
+logger = logging.getLogger(__name__)
+
+
+def configure_device() -> str:
+    """
+    Configure TensorFlow to use the best available device.
+    Equivalent to the PyTorch cuda/mps/cpu selection.
+    Returns the device name being used.
+    """
+    gpus = tf.config.list_physical_devices('GPU')
+    print(tf.config.list_physical_devices()) 
+    if gpus:
+        # GPU found — could be NVIDIA CUDA on PC or Metal on Mac
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print(platform.system())
+            device_name = gpus[0].name
+            if platform.system() == "Darwin":
+                logger.info("Training on device: Apple Metal GPU (%s)", device_name)
+            else:
+                logger.info("Training on device: CUDA GPU (%s)", device_name)
+            return device_name
+        except RuntimeError as e:
+            logger.warning("GPU configuration failed, falling back to CPU: %s", e)
+
+    logger.info("Training on device: CPU")
+    return "CPU"
 
 def create_model(input_shape, units=128, activation='relu', l2_value=0.01, dropout_rate=None, learning_rate=1e-3):
     inputs = layers.Input(shape=input_shape)
@@ -45,6 +75,7 @@ def prepare_data_for_cnn(X: pd.DataFrame, y: pd.DataFrame) -> Tuple[np.ndarray, 
     return X_reshaped, y_array
 
 
+
 def train_model(
     X_train: pd.DataFrame,
     y_train: pd.DataFrame,
@@ -56,7 +87,7 @@ def train_model(
 ) -> tf.keras.Model:
     X_train_cnn, y_train_cnn = prepare_data_for_cnn(X_train, y_train)
     input_shape = (X_train_cnn.shape[1], 1)
-
+    device_name = configure_device()
     # Log params to an externally-managed run if one exists
     if mlflow.active_run():
         mlflow.log_params({
@@ -67,6 +98,7 @@ def train_model(
             "dropout_rate": dropout_rate,
             "input_shape": str(input_shape),
             "model_type": "CNN_1D",
+            "device": device_name,
         })
 
     model = create_model(
