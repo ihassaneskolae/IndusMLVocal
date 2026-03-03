@@ -64,7 +64,6 @@ def train_model(
 ) -> tf.keras.Model:
     
     configure_device()
-    mlflow.tensorflow.autolog(disable=True)
 
     if len(X_train.shape) == 2:
         X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
